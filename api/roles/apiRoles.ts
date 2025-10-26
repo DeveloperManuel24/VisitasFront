@@ -9,7 +9,7 @@ import { getAuthToken } from '../Auth/apiAuth' // <-- ajusta ruta real si está 
 // este es el backend Nest que expone /roles
 // ============================
 const axiosUsuarios = axios.create({
-  baseURL: 'http://localhost:3000', // <-- asegúrate que acá vive /roles en tu Nest
+  baseURL: 'https://visitasbackusuarios-production.up.railway.app', // <-- asegúrate que acá vive /roles en tu Nest
 })
 
 // inyectar Bearer token en cada request
