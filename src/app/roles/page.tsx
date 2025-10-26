@@ -1,48 +1,104 @@
-"use client";
+'use client'
 
-import { useEffect, useState } from "react";
-import { Navbar } from "@/components/navbar";
-import { Container } from "@/components/container";
-import { Heading, Subheading } from "@/components/text";
-import { Button } from "@/components/button";
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
-import { listarRoles, eliminarRol } from "../../../api/roles/apiRoles";
-import RequireAuth from "../components/require-auth";
+import { Navbar } from '@/components/navbar'
+import { Container } from '@/components/container'
+import { Heading, Subheading } from '@/components/text'
+import { Button } from '@/components/button'
+
+import { listarRoles, eliminarRol } from '../../../api/roles/apiRoles'
+import RequireAuth from '@/app/components/require-auth'
+import { useAuth } from '@/app/components/auth-context'
 
 type RolItem = {
-  id?: string | number;
-  nombre?: string;
-  descripcion?: string;
-  [key: string]: any;
-};
+  id?: string | number
+  nombre?: string
+  descripcion?: string
+  [key: string]: any
+}
 
+/**
+ * VISIBILIDAD:
+ * - ADMINISTRADOR ✅
+ * - SUPERVISOR ❌
+ * - TECNICO ❌
+ */
 export default function RolesPage() {
-  const [roles, setRoles] = useState<RolItem[]>([]);
-  const [cargando, setCargando] = useState(false);
+  const router = useRouter()
+  const { roles } = useAuth()
+
+  const [rolesData, setRolesData] = useState<RolItem[]>([])
+  const [cargando, setCargando] = useState(false)
+  const [ready, setReady] = useState(false) // ya confirmé que sí es admin
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
+  // gate sólo ADMINISTRADOR
+  useEffect(() => {
+    if (!roles || roles.length === 0) {
+      return
+    }
+
+    if (!roles.includes('ADMINISTRADOR')) {
+      router.replace('/unauthorized')
+      return
+    }
+
+    setReady(true)
+  }, [roles, router])
 
   async function refrescarRoles() {
     try {
-      setCargando(true);
-      const data = await listarRoles();
-      setRoles(Array.isArray(data) ? data : []);
+      setCargando(true)
+      setErrorMsg(null)
+
+      const data = await listarRoles()
+
+      // si el backend tiró 401/403 lo marcamos
+      if (data && typeof data === 'object' && (data as any).__authError) {
+        setErrorMsg('No estás autorizado para ver roles.')
+        // opcional: router.replace('/unauthorized')
+        setRolesData([])
+        return
+      }
+
+      setRolesData(Array.isArray(data) ? data : [])
     } finally {
-      setCargando(false);
+      setCargando(false)
     }
   }
 
   useEffect(() => {
-    refrescarRoles();
-  }, []);
+    if (ready) {
+      refrescarRoles()
+    }
+  }, [ready])
+
+  // Mientras no confirmamos que es admin
+  if (!ready) {
+    return (
+      <RequireAuth>
+        <main className="bg-gray-50 min-h-dvh text-gray-950 flex items-center justify-center text-xs text-zinc-500">
+          Verificando acceso…
+        </main>
+      </RequireAuth>
+    )
+  }
 
   async function handleEliminar(id: string | number | undefined) {
-    if (!id) return;
-    const ok = window.confirm("¿Eliminar este rol?");
-    if (!ok) return;
+    if (!id) return
+    const ok = window.confirm('¿Eliminar este rol?')
+    if (!ok) return
     try {
-      await eliminarRol(String(id));
-      await refrescarRoles();
-    } catch (err) {
-      console.error("Error eliminando rol:", err);
+      await eliminarRol(String(id))
+      await refrescarRoles()
+    } catch (err: any) {
+      console.error('Error eliminando rol:', err)
+      setErrorMsg(
+        err?.message ||
+          'No se pudo eliminar el rol (¿tienes permiso?).',
+      )
     }
   }
 
@@ -89,21 +145,27 @@ export default function RolesPage() {
 
               <div className="text-xs/5 text-gray-500">
                 {cargando
-                  ? "Cargando..."
-                  : `${roles.length} rol${
-                      roles.length === 1 ? "" : "es"
+                  ? 'Cargando...'
+                  : `${rolesData.length} rol${
+                      rolesData.length === 1 ? '' : 'es'
                     } encontrados`}
               </div>
             </div>
 
+            {errorMsg && (
+              <div className="mt-4 text-sm/6 font-medium text-red-600">
+                ❌ {errorMsg}
+              </div>
+            )}
+
             {/* --- VISTA MOBILE (cards) --- */}
             <ul className="mt-6 flex flex-col gap-4 lg:hidden">
-              {roles.length === 0 && !cargando ? (
+              {rolesData.length === 0 && !cargando ? (
                 <li className="text-center py-8 text-gray-400 text-sm/6">
                   No hay roles registrados.
                 </li>
               ) : (
-                roles.map((rol, i) => (
+                rolesData.map((rol, i) => (
                   <li
                     key={rol.id ?? i}
                     className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm ring-1 ring-black/5"
@@ -111,15 +173,15 @@ export default function RolesPage() {
                     {/* Título + ID */}
                     <div className="flex flex-col">
                       <div className="text-base/6 font-medium text-gray-900 break-words">
-                        {rol.nombre ?? rol.name ?? "—"}
+                        {rol.nombre ?? rol.name ?? '—'}
                       </div>
 
                       <div className="text-xs/5 text-gray-500 break-words mt-1">
-                        {rol.descripcion ?? rol.description ?? "—"}
+                        {rol.descripcion ?? rol.description ?? '—'}
                       </div>
 
                       <div className="text-[10px]/4 text-gray-400 break-all mt-2">
-                        ID: {rol.id ?? "—"}
+                        ID: {rol.id ?? '—'}
                       </div>
                     </div>
 
@@ -137,11 +199,11 @@ export default function RolesPage() {
                         variant="secondary"
                         onClick={() => handleEliminar(rol.id)}
                         className={[
-                          "px-4 py-2 text-sm/6 sm:w-auto w-full",
-                          "text-red-600 ring-red-200",
-                          "data-hover:bg-red-50 data-hover:text-red-700 data-hover:ring-red-300",
-                          "focus-visible:outline-red-600",
-                        ].join(" ")}
+                          'px-4 py-2 text-sm/6 sm:w-auto w-full',
+                          'text-red-600 ring-red-200',
+                          'data-hover:bg-red-50 data-hover:text-red-700 data-hover:ring-red-300',
+                          'focus-visible:outline-red-600',
+                        ].join(' ')}
                       >
                         Eliminar
                       </Button>
@@ -166,7 +228,7 @@ export default function RolesPage() {
                 </thead>
 
                 <tbody className="align-top">
-                  {roles.length === 0 && !cargando ? (
+                  {rolesData.length === 0 && !cargando ? (
                     <tr>
                       <td
                         colSpan={4}
@@ -176,19 +238,19 @@ export default function RolesPage() {
                       </td>
                     </tr>
                   ) : (
-                    roles.map((rol, i) => (
+                    rolesData.map((rol, i) => (
                       <tr
                         key={rol.id ?? i}
                         className="border-b border-gray-100 last:border-0"
                       >
                         <td className="py-3 pr-4 tabular-nums font-medium text-gray-900">
-                          {rol.id ?? "—"}
+                          {rol.id ?? '—'}
                         </td>
                         <td className="py-3 pr-4 font-medium text-gray-900">
-                          {rol.nombre ?? rol.name ?? "—"}
+                          {rol.nombre ?? rol.name ?? '—'}
                         </td>
                         <td className="py-3 pr-4 max-w-[24rem] text-gray-600">
-                          {rol.descripcion ?? rol.description ?? "—"}
+                          {rol.descripcion ?? rol.description ?? '—'}
                         </td>
                         <td className="py-3 pr-4 text-right">
                           <div className="flex justify-start gap-4 sm:justify-end sm:gap-3">
@@ -204,11 +266,11 @@ export default function RolesPage() {
                               variant="secondary"
                               onClick={() => handleEliminar(rol.id)}
                               className={[
-                                "px-4 py-2 text-sm/6",
-                                "text-red-600 ring-red-200",
-                                "data-hover:bg-red-50 data-hover:text-red-700 data-hover:ring-red-300",
-                                "focus-visible:outline-red-600",
-                              ].join(" ")}
+                                'px-4 py-2 text-sm/6',
+                                'text-red-600 ring-red-200',
+                                'data-hover:bg-red-50 data-hover:text-red-700 data-hover:ring-red-300',
+                                'focus-visible:outline-red-600',
+                              ].join(' ')}
                             >
                               Eliminar
                             </Button>
@@ -224,5 +286,5 @@ export default function RolesPage() {
         </Container>
       </main>
     </RequireAuth>
-  );
+  )
 }

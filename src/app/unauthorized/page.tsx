@@ -1,42 +1,24 @@
 // src/app/unauthorized/page.tsx
-import { Container } from "@/components/container"
-import { Navbar } from "@/components/navbar"
-import { Button } from "@/components/button"
-import { Heading, Subheading } from "@/components/text"
+'use client'
+
+import Link from 'next/link'
 
 export default function UnauthorizedPage() {
   return (
-    <main className="bg-gray-50 min-h-dvh text-gray-950 overflow-hidden">
-      <Container>
-        <Navbar
-          banner={
-            <div className="flex items-center gap-1 rounded-full bg-red-800/40 px-3 py-0.5 text-sm/6 font-medium text-white">
-              Acceso restringido
-            </div>
-          }
-        />
-      </Container>
+    <main className="flex min-h-[60vh] flex-col items-center justify-center text-center text-gray-800 p-8">
+      <div className="text-3xl font-semibold text-red-600">
+        Acceso denegado
+      </div>
+      <p className="mt-4 text-sm text-gray-600 max-w-sm">
+        No tenés permisos para ver esta sección.
+      </p>
 
-      <Container className="pb-24">
-        <div className="mt-24 max-w-xl">
-          <Subheading>Sesión requerida</Subheading>
-
-          <Heading as="h1" className="mt-2">
-            No autorizado.
-          </Heading>
-
-          <p className="mt-4 text-sm/6 text-gray-600">
-            Necesitas iniciar sesión para ver esta sección.
-          </p>
-
-          <div className="mt-8 flex gap-4">
-            <Button href="/login">Ir al login</Button>
-            <Button variant="secondary" href="/">
-              Volver al inicio
-            </Button>
-          </div>
-        </div>
-      </Container>
+      <Link
+        href="/"
+        className="mt-8 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50"
+      >
+        Volver al panel
+      </Link>
     </main>
   )
 }

@@ -11,9 +11,6 @@ import RequireAuth from '@/app/components/require-auth'
 
 import { crearCliente } from '../../../../api/clientes/apiClientes'
 
-/* --------------------------------------------
- * Vista previa del mapa + botones de ruta
- * -------------------------------------------- */
 function MapPreviewLite({
   lat,
   lng,
@@ -25,12 +22,14 @@ function MapPreviewLite({
   label?: string
   direccion?: string | null
 }) {
+  // normalizar a número
   const latNum =
     typeof lat === 'string'
       ? parseFloat(lat)
       : typeof lat === 'number'
       ? lat
       : null
+
   const lngNum =
     typeof lng === 'string'
       ? parseFloat(lng)
@@ -62,9 +61,12 @@ function MapPreviewLite({
     )
   }
 
-  const gmapsEmbed = `https://www.google.com/maps?q=${latNum},${lngNum}&z=16&output=embed`
-  const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latNum},${lngNum}`
-  const wazeUrl = `https://waze.com/ul?ll=${latNum},${lngNum}&navigate=yes`
+  const latVal = latNum!
+  const lngVal = lngNum!
+
+  const gmapsEmbed = `https://www.google.com/maps?q=${latVal},${lngVal}&z=16&output=embed`
+  const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latVal},${lngVal}`
+  const wazeUrl = `https://waze.com/ul?ll=${latVal},${lngVal}&navigate=yes`
 
   return (
     <div className="overflow-hidden rounded-lg ring-1 ring-black/10 shadow-sm bg-white">
@@ -108,9 +110,6 @@ function MapPreviewLite({
   )
 }
 
-/* --------------------------------------------
- * Página Crear Cliente
- * -------------------------------------------- */
 export default function CrearClientePage() {
   const router = useRouter()
 
@@ -120,53 +119,60 @@ export default function CrearClientePage() {
   const [telefono, setTelefono] = useState('')
   const [correo, setCorreo] = useState('')
   const [nit, setNit] = useState('')
+
+  // coordenadas reales que vamos a guardar
   const [lat, setLat] = useState<string>('')
   const [lng, setLng] = useState<string>('')
 
-  // estado geocoding del buscador
+  // búsqueda de dirección (input del usuario para geocoding)
   const [searchUbicacion, setSearchUbicacion] = useState('')
   const [geoMsg, setGeoMsg] = useState<string | null>(null)
   const [geocoding, setGeocoding] = useState(false)
+
+  // guardamos el timeout id del debounce
+  const geocodeTimeoutRef = useRef<number | null>(null)
 
   // ui submit
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState<string | null>(null)
 
-  // ref para debounce
-  const geocodeTimeoutRef = useRef<number | null>(null)
-
-  /* -------------------------------------------------
-   * Geocoding automático SOLO del campo de búsqueda
-   * ------------------------------------------------- */
+  // efecto de geocoding con debounce
   useEffect(() => {
-    // si el campo está vacío, no hacemos nada
-    if (!searchUbicacion.trim()) {
+    const query = searchUbicacion.trim()
+
+    // si está vacío, limpiamos mensajes y no buscamos
+    if (!query) {
       setGeoMsg(null)
+      if (geocodeTimeoutRef.current) {
+        window.clearTimeout(geocodeTimeoutRef.current)
+      }
       return
     }
 
-    // limpiamos timeout anterior si sigue escribiendo
+    // limpiamos cualquier timeout previo
     if (geocodeTimeoutRef.current) {
       window.clearTimeout(geocodeTimeoutRef.current)
     }
 
-    // nuevo intento en 800ms
     geocodeTimeoutRef.current = window.setTimeout(async () => {
       try {
         setGeocoding(true)
         setGeoMsg('Buscando ubicación…')
 
-        const q = encodeURIComponent(searchUbicacion.trim())
+        const q = encodeURIComponent(query)
         const url = `https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1`
 
         const res = await fetch(url, {
           headers: {
             Accept: 'application/json',
+            // algunos servidores Nominatim piden esto
+            'User-Agent': 'skyvisit/1.0 (contacto@skynet-visitas.local)',
+            'Accept-Language': 'es',
           },
         })
 
         if (!res.ok) {
-          throw new Error('falló geocoding')
+          throw new Error('No se pudo geocodificar')
         }
 
         const results = await res.json()
@@ -177,9 +183,15 @@ export default function CrearClientePage() {
         }
 
         const best = results[0]
+
+        // validamos coords
         if (best?.lat && best?.lon) {
-          setLat(String(best.lat))
-          setLng(String(best.lon))
+          const newLat = String(best.lat)
+          const newLng = String(best.lon)
+
+          setLat((prev) => (prev ? prev : newLat))
+          setLng((prev) => (prev ? prev : newLng))
+
           setGeoMsg('Ubicación encontrada ✔')
         } else {
           setGeoMsg('Respuesta sin coordenadas')
@@ -192,7 +204,6 @@ export default function CrearClientePage() {
       }
     }, 800) as unknown as number
 
-    // cleanup
     return () => {
       if (geocodeTimeoutRef.current) {
         window.clearTimeout(geocodeTimeoutRef.current)
@@ -200,9 +211,6 @@ export default function CrearClientePage() {
     }
   }, [searchUbicacion])
 
-  /* -------------------------------------------------
-   * Guardar cliente
-   * ------------------------------------------------- */
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setGuardando(true)
@@ -271,7 +279,6 @@ export default function CrearClientePage() {
             >
               {/* Columna izquierda */}
               <div className="space-y-5">
-                {/* Nombre */}
                 <div>
                   <label className="block text-sm/5 font-medium text-gray-900">
                     Nombre del cliente / agencia
@@ -284,7 +291,6 @@ export default function CrearClientePage() {
                   />
                 </div>
 
-                {/* Dirección (textarea libre) */}
                 <div>
                   <label className="block text-sm/5 font-medium text-gray-900">
                     Dirección / punto de servicio
@@ -303,7 +309,6 @@ zona 5 Villa Nueva, portón negro, casa esquina`}
                   </p>
                 </div>
 
-                {/* NIT */}
                 <div>
                   <label className="block text-sm/5 font-medium text-gray-900">
                     NIT
@@ -316,7 +321,6 @@ zona 5 Villa Nueva, portón negro, casa esquina`}
                   />
                 </div>
 
-                {/* Teléfono */}
                 <div>
                   <label className="block text-sm/5 font-medium text-gray-900">
                     Teléfono
@@ -329,7 +333,6 @@ zona 5 Villa Nueva, portón negro, casa esquina`}
                   />
                 </div>
 
-                {/* Correo */}
                 <div>
                   <label className="block text-sm/5 font-medium text-gray-900">
                     Correo de contacto
@@ -346,7 +349,6 @@ zona 5 Villa Nueva, portón negro, casa esquina`}
 
               {/* Columna derecha */}
               <div className="space-y-5">
-                {/* Buscador de ubicación (geocoding) */}
                 <div>
                   <label className="block text-sm/5 font-medium text-gray-900">
                     Buscar ubicación en mapa
@@ -366,7 +368,6 @@ zona 5 Villa Nueva, portón negro, casa esquina`}
                   )}
                 </div>
 
-                {/* Lat/Lng manuales */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm/5 font-medium text-gray-900">
@@ -393,7 +394,6 @@ zona 5 Villa Nueva, portón negro, casa esquina`}
                   </div>
                 </div>
 
-                {/* Preview mapa + links navegación */}
                 <MapPreviewLite
                   lat={lat}
                   lng={lng}
@@ -407,14 +407,12 @@ zona 5 Villa Nueva, portón negro, casa esquina`}
                 </p>
               </div>
 
-              {/* feedback general */}
               {mensaje && (
                 <div className="lg:col-span-2 text-sm/6 font-medium text-gray-700">
                   {mensaje}
                 </div>
               )}
 
-              {/* botones guardar / cancelar */}
               <div className="lg:col-span-2 pt-2 flex flex-col gap-3 sm:flex-row">
                 <Button
                   type="submit"

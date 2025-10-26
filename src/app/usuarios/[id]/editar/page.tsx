@@ -8,6 +8,7 @@ import { Container } from '@/components/container'
 import { Heading, Subheading } from '@/components/text'
 import { Button } from '@/components/button'
 import RequireAuth from '@/app/components/require-auth'
+import { useAuth } from '@/app/components/auth-context'
 
 import {
   obtenerUsuarioPorId,
@@ -33,24 +34,34 @@ type PropsEditar = {
   params: { id: string }
 }
 
+/**
+ * VISIBILIDAD:
+ * - ADMINISTRADOR ✅
+ * - SUPERVISOR ❌
+ * - TECNICO ❌
+ */
 export default function EditarUsuarioPage({ params }: PropsEditar) {
-  // ✅ copiamos params.id a estado una sola vez para evitar el warning de Next 15
+  // guardamos el id una sola vez para evitar rerender extraño de Next
   const [id] = useState(() => params?.id ?? '')
 
   const router = useRouter()
+  const { roles } = useAuth() // roles del usuario logueado
 
-  // ----- estado general -----
+  // gate admin
+  const [ready, setReady] = useState(false)
+
+  // estado general
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState<string | null>(null)
 
-  // ----- campos principales -----
+  // campos editables
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [activo, setActivo] = useState(true)
 
-  // supervisorId: '' = "sin supervisor"
-  const [supervisorId, setSupervisorId] = useState<string>('')
+  // supervisor / rol
+  const [supervisorId, setSupervisorId] = useState<string>('') // '' = sin supervisor
   const [rolSeleccionado, setRolSeleccionado] = useState<string>('')
 
   // foto
@@ -69,14 +80,33 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
   const [errorPass, setErrorPass] = useState<string | null>(null)
 
   // ==========================================================
-  // cargar datos iniciales
+  // 1. Gate de administrador
   // ==========================================================
   useEffect(() => {
-    if (!id) return
+    // esperamos a que roles llegue desde useAuth
+    if (!roles || roles.length === 0) return
+
+    // si NO sos admin -> pátio
+    if (!roles.includes('ADMINISTRADOR')) {
+      router.replace('/unauthorized')
+      return
+    }
+
+    // sí sos admin
+    setReady(true)
+  }, [roles, router])
+
+  // ==========================================================
+  // 2. Cargar datos iniciales cuando:
+  //    - ya confirmamos que sos admin (ready === true)
+  //    - hay id válido en la URL
+  // ==========================================================
+  useEffect(() => {
+    if (!ready || !id) return
 
     const cargar = async () => {
       try {
-        // 1. usuario actual
+        // 1. Traer usuario que estoy editando
         const user: UsuarioData | null = await obtenerUsuarioPorId(id)
         if (!user) {
           setMensaje('No se encontró el usuario')
@@ -88,24 +118,24 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
         setEmail(user.email ?? '')
         setActivo(Boolean(user.activo))
 
-        // supervisor null en DB -> '' en UI
+        // supervisor null -> '' en UI
         setSupervisorId(user.supervisorId ?? '')
 
         setFotoPreview(user.fotoBase64 ?? null)
         setFotoBase64(user.fotoBase64 ?? null)
 
-        // 2. rol actual (agarra el primero)
+        // 2. Rol actual (agarramos el primer rol que tenga)
         const rolActual =
           user.usuariosRoles && user.usuariosRoles[0]
             ? user.usuariosRoles[0].rol?.id
             : ''
         setRolSeleccionado(rolActual || '')
 
-        // 3. catálogo roles
-        const roles = await listarRoles()
-        setRolesDisponibles(Array.isArray(roles) ? roles : [])
+        // 3. Catálogo de roles disponibles
+        const rolesResp = await listarRoles()
+        setRolesDisponibles(Array.isArray(rolesResp) ? rolesResp : [])
 
-        // 4. supervisores
+        // 4. Supervisores posibles (usuarios activos)
         const { data: listaSup } = await listarUsuarios({
           activo: true,
           limit: 100,
@@ -128,10 +158,10 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
     }
 
     cargar()
-  }, [id])
+  }, [ready, id])
 
   // ==========================================================
-  // manejo de imagen de perfil
+  // Manejo de imagen
   // ==========================================================
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -147,7 +177,8 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
   }
 
   // ==========================================================
-  // guardar datos generales del usuario
+  // Guardar datos generales del usuario
+  // PATCH /usuarios/:id
   // ==========================================================
   async function handleGuardar(e: React.FormEvent) {
     e.preventDefault()
@@ -176,7 +207,7 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
   }
 
   // ==========================================================
-  // abrir / cerrar modal de credenciales
+  // Modal credenciales
   // ==========================================================
   function openPasswordModal() {
     setErrorPass(null)
@@ -189,7 +220,13 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
   }
 
   // ==========================================================
-  // guardar nueva contraseña via /auth/change-password
+  // Guardar nueva contraseña
+  // POST /auth/change-password
+  // Body esperado por backend:
+  // { "userId": <id del usuario que estamos editando>, "newPassword": <string> }
+  //
+  // Nosotros ya le estamos mandando `id` (el del usuario que estás editando),
+  // y `nuevaPass`.
   // ==========================================================
   async function handleGuardarCredenciales(e: React.FormEvent) {
     e.preventDefault()
@@ -197,7 +234,7 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
 
     setErrorPass(null)
 
-    // validación simple
+    // validaciones básicas UX
     if (!nuevaPass.trim()) {
       setErrorPass('Debes ingresar la nueva contraseña.')
       return
@@ -207,7 +244,7 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
       return
     }
 
-    // llamamos al endpoint protegido con Bearer
+    // le mandamos el ID del usuario actual que estás editando
     const resp = await changePassword(id, nuevaPass)
 
     if (!resp.ok) {
@@ -216,13 +253,11 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
       if (resp.status === 401) {
         setErrorPass('Sesión inválida. Vuelve a iniciar sesión.')
       } else if (resp.status === 403) {
-        setErrorPass(
-          'No tienes permiso para cambiar la contraseña de este usuario.',
-        )
+        setErrorPass('No tienes permiso para cambiar la contraseña de este usuario.')
       } else if (resp.status === 400) {
         setErrorPass(
           resp.error ||
-            'La nueva contraseña no pasó las validaciones del backend.',
+            'La nueva contraseña no pasó las validaciones del backend.'
         )
       } else {
         setErrorPass('No se pudo cambiar la contraseña.')
@@ -238,8 +273,21 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
   }
 
   // ==========================================================
-  // loading state
+  // Estados intermedios
   // ==========================================================
+
+  // Aún no sé si sos admin -> no muestro nada sensible todavía
+  if (!ready) {
+    return (
+      <RequireAuth>
+        <main className="bg-gray-50 min-h-dvh text-gray-950 flex items-center justify-center text-xs text-zinc-500">
+          Verificando acceso…
+        </main>
+      </RequireAuth>
+    )
+  }
+
+  // Ya sé que sos admin pero sigo jalando data de este usuario
   if (cargando) {
     return (
       <RequireAuth>
@@ -256,7 +304,7 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
   }
 
   // ==========================================================
-  // UI principal
+  // Render final
   // ==========================================================
   return (
     <RequireAuth>
@@ -343,8 +391,7 @@ export default function EditarUsuarioPage({ params }: PropsEditar) {
                     required
                   />
                   <p className="mt-1 text-[11px]/5 text-gray-500">
-                    También puedes cambiar contraseña desde &quot;Cambiar
-                    credenciales&quot;.
+                    También puedes cambiar contraseña desde "Cambiar credenciales".
                   </p>
                 </div>
 

@@ -7,15 +7,20 @@ import { Heading, Subheading } from '@/components/text'
 import { Button } from '@/components/button'
 import RequireAuth from '@/app/components/require-auth'
 
-// OJO: ajustá este import según dónde está realmente api/
-// Si tu repo tiene api/ al mismo nivel que src/ (que es lo que venimos usando),
-// entonces ../../api/... es correcto.
+// Estos imports asumen que tu carpeta api está en src/app/api/Auth/... etc
+// Ajustá la ruta si tu árbol real es distinto
 import {
   listarClientes,
   eliminarCliente,
 } from '../../../api/clientes/apiClientes'
 import type { ClienteItem } from '../../../api/clientes/apiClientes'
 
+/**
+ * VISIBILIDAD:
+ * - ADMINISTRADOR ✅
+ * - SUPERVISOR ✅
+ * - TECNICO ❌ (RequireAuth lo bloquea porque /clientes no es /visitas-tecnico)
+ */
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<ClienteItem[]>([])
   const [cargando, setCargando] = useState(false)
@@ -78,7 +83,6 @@ export default function ClientesPage() {
             </div>
 
             <div className="flex-shrink-0">
-              {/* 👇 este botón YA está bien, esto va a /clientes/crear */}
               <Button href="/clientes/crear">+ Nuevo cliente</Button>
             </div>
           </div>

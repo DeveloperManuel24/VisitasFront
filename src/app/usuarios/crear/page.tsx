@@ -34,49 +34,51 @@ export default function CrearUsuarioPage() {
   const [rolesDisponibles, setRolesDisponibles] = useState<RolLite[]>([])
   const [supervisores, setSupervisores] = useState<SupervisorLite[]>([])
 
-  // feedback
+  // feedback UI
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState<string | null>(null)
 
-  // cargar roles y supervisores
+  // cargar roles y posibles supervisores
   useEffect(() => {
     ;(async () => {
       try {
-        // roles
+        // 1. roles
         const roles = await listarRoles()
-        setRolesDisponibles(
-          Array.isArray(roles) ? roles : [],
-        )
+        setRolesDisponibles(Array.isArray(roles) ? roles : [])
 
-        // supervisores:
-        // Básicamente traemos usuarios activos y que podrían ser supervisor
-        // Por ahora traemos todos y ya. Luego puedes filtrar por rol 'SUPERVISOR'
+        // 2. supervisores
+        // traemos usuarios activos; usamos nombre o email como label
         const { data: lista } = await listarUsuarios({
           activo: true,
           limit: 100,
         })
-        setSupervisores(
-          Array.isArray(lista)
-            ? lista.map((u: any) => ({
+
+        // sanity: normalizamos y evitamos nulos raros
+        const supList: SupervisorLite[] = Array.isArray(lista)
+          ? lista
+              .filter((u: any) => u && !u.eliminadoEn) // no soft-deleted
+              .map((u: any) => ({
                 id: u.id,
-                nombre: u.nombre ?? u.email ?? '—',
+                nombre: u.nombre?.trim() || u.email?.trim() || '—',
               }))
-            : [],
-        )
+          : []
+
+        setSupervisores(supList)
       } catch (err) {
         console.error('Error cargando data inicial:', err)
+        setMensaje('⚠️ No se pudieron cargar roles / supervisores.')
       }
     })()
   }, [])
 
-  // manejar imagen
+  // manejar imagen de perfil
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
     const reader = new FileReader()
     reader.onloadend = () => {
-      const base64 = reader.result as string // "data:image/png;base64,AAAA"
+      const base64 = reader.result as string // "data:image/png;base64,AAAA..."
       setFotoPreview(base64)
       setFotoBase64(base64)
     }
@@ -85,6 +87,7 @@ export default function CrearUsuarioPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+
     if (!nombre.trim() || !email.trim() || !password.trim()) {
       setMensaje('❌ Faltan campos obligatorios.')
       return
@@ -97,15 +100,17 @@ export default function CrearUsuarioPage() {
       await crearUsuario({
         nombre,
         email,
-        hash: password, // backend lo hashea si no empieza con $2
+        hash: password, // el backend lo hashea si no empieza con $2
         activo,
         supervisorId: supervisorId || undefined,
         roles: rolSeleccionado ? [rolSeleccionado] : [],
         fotoBase64: fotoBase64 ?? undefined,
       })
 
+      // si llegó acá = éxito
       setMensaje('✅ Usuario creado con éxito.')
-      // limpiar
+
+      // limpiar form
       setNombre('')
       setEmail('')
       setPassword('')
@@ -114,9 +119,21 @@ export default function CrearUsuarioPage() {
       setRolSeleccionado('')
       setFotoBase64(null)
       setFotoPreview(null)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creando usuario:', err)
-      setMensaje('❌ Error al crear el usuario.')
+
+      // tratamos de surfear el mensaje del backend
+      const backendMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        'Error al crear el usuario.'
+
+      // puede venir como array (class-validator), lo normalizamos
+      const prettyMsg = Array.isArray(backendMsg)
+        ? backendMsg.join(' | ')
+        : String(backendMsg)
+
+      setMensaje(`❌ ${prettyMsg}`)
     } finally {
       setGuardando(false)
     }
@@ -166,7 +183,10 @@ export default function CrearUsuarioPage() {
               Define información básica, acceso y supervisor directo.
             </p>
 
-            <form onSubmit={handleSubmit} className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <form
+              onSubmit={handleSubmit}
+              className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2"
+            >
               {/* Columna izquierda */}
               <div className="space-y-5">
                 {/* Nombre */}
@@ -175,6 +195,8 @@ export default function CrearUsuarioPage() {
                     Nombre completo
                   </label>
                   <input
+                    name="nombre"
+                    autoComplete="off"
                     className="mt-2 block w-full rounded-lg border border-transparent bg-white px-3 py-2 text-sm/6 text-gray-900 shadow-sm ring-1 ring-black/10 data-focus:outline-2 data-focus:-outline-offset-1 data-focus:outline-black"
                     value={nombre}
                     onChange={(e) => setNombre(e.target.value)}
@@ -190,6 +212,8 @@ export default function CrearUsuarioPage() {
                   </label>
                   <input
                     type="email"
+                    name="email"
+                    autoComplete="off"
                     className="mt-2 block w-full rounded-lg border border-transparent bg-white px-3 py-2 text-sm/6 text-gray-900 shadow-sm ring-1 ring-black/10 data-focus:outline-2 data-focus:-outline-offset-1 data-focus:outline-black"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -205,6 +229,8 @@ export default function CrearUsuarioPage() {
                   </label>
                   <input
                     type="password"
+                    name="password"
+                    autoComplete="new-password"
                     className="mt-2 block w-full rounded-lg border border-transparent bg-white px-3 py-2 text-sm/6 text-gray-900 shadow-sm ring-1 ring-black/10 data-focus:outline-2 data-focus:-outline-offset-1 data-focus:outline-black"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -217,6 +243,7 @@ export default function CrearUsuarioPage() {
                 <div className="flex items-center gap-3">
                   <input
                     id="activo"
+                    name="activo"
                     type="checkbox"
                     checked={activo}
                     onChange={(e) => setActivo(e.target.checked)}
@@ -239,6 +266,7 @@ export default function CrearUsuarioPage() {
                     Rol
                   </label>
                   <select
+                    name="rol"
                     className="mt-2 block w-full rounded-lg border border-transparent bg-white px-3 py-2 text-sm/6 text-gray-900 shadow-sm ring-1 ring-black/10 data-focus:outline-2 data-focus:-outline-offset-1 data-focus:outline-black"
                     value={rolSeleccionado}
                     onChange={(e) => setRolSeleccionado(e.target.value)}
@@ -258,6 +286,7 @@ export default function CrearUsuarioPage() {
                     Supervisor directo
                   </label>
                   <select
+                    name="supervisorId"
                     className="mt-2 block w-full rounded-lg border border-transparent bg-white px-3 py-2 text-sm/6 text-gray-900 shadow-sm ring-1 ring-black/10 data-focus:outline-2 data-focus:-outline-offset-1 data-focus:outline-black"
                     value={supervisorId}
                     onChange={(e) => setSupervisorId(e.target.value)}

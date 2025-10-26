@@ -8,6 +8,7 @@ import { Container } from '@/components/container'
 import { Heading, Subheading } from '@/components/text'
 import { Button } from '@/components/button'
 import RequireAuth from '@/app/components/require-auth'
+import { useAuth } from '@/app/components/auth-context'
 
 import { crearVisita } from '../../../../api/visitas/apiVisitas'
 import {
@@ -30,7 +31,6 @@ function MapPreviewLite({
   label?: string
   direccion?: string | null
 }) {
-  // normalizar lat/lng aunque vengan como string
   const latNum =
     typeof lat === 'string'
       ? parseFloat(lat)
@@ -131,7 +131,6 @@ function MapPreviewLite({
 
 /* -------------------------------------------------
  * helper: determina si un usuario tiene un rol X
- * (usa usuariosRoles[].rol.nombre)
  * ------------------------------------------------- */
 function userHasRol(user: any, rolBuscado: 'SUPERVISOR' | 'TECNICO') {
   if (!user || !Array.isArray(user.usuariosRoles)) return false
@@ -142,10 +141,6 @@ function userHasRol(user: any, rolBuscado: 'SUPERVISOR' | 'TECNICO') {
 
 /* -------------------------------------------------
  * SelectRolUsuario
- * - trae todos los usuarios con listarUsuarios()
- * - filtra por SUPERVISOR o TECNICO
- * - muestra SOLO el nombre
- * - required
  * ------------------------------------------------- */
 function SelectRolUsuario({
   label,
@@ -168,13 +163,10 @@ function SelectRolUsuario({
       setCargando(true)
       try {
         const res = await listarUsuarios()
-        // res es { data: [...], meta: ... }
         const lista = Array.isArray(res?.data) ? res.data : []
-
         const filtrados = lista.filter((u: any) =>
           userHasRol(u, roleFilter),
         )
-
         setUsuariosFiltrados(filtrados)
       } catch (err) {
         console.error('Error cargando usuarios:', err)
@@ -222,9 +214,7 @@ function SelectRolUsuario({
 }
 
 /* -------------------------------------------------
- * SelectCliente con buscador live (q -> backend)
- * - cuando seleccionás cliente, levantamos también
- *   el registro completo (para mapa)
+ * SelectCliente con buscador live
  * ------------------------------------------------- */
 function SelectCliente({
   value,
@@ -316,6 +306,20 @@ function SelectCliente({
  * ====================================================== */
 export default function CrearVisitaPage() {
   const router = useRouter()
+  const { roles } = useAuth()
+
+  // gate de acceso: solo ADMINISTRADOR o SUPERVISOR crean visitas
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    if (!roles || roles.length === 0) return
+    const upper = roles.map((r) => r.toUpperCase())
+    if (!upper.includes('ADMINISTRADOR') && !upper.includes('SUPERVISOR')) {
+      router.replace('/unauthorized')
+      return
+    }
+    setReady(true)
+  }, [roles, router])
 
   // estado del formulario
   const [clienteId, setClienteId] = useState('')
@@ -335,13 +339,7 @@ export default function CrearVisitaPage() {
     setGuardando(true)
     setMensaje(null)
 
-    // bloqueo front: todos obligatorios
-    if (
-      !clienteId ||
-      !supervisorId ||
-      !tecnicoId ||
-      !scheduledAt
-    ) {
+    if (!clienteId || !supervisorId || !tecnicoId || !scheduledAt) {
       setMensaje('❌ Faltan datos obligatorios.')
       setGuardando(false)
       return
@@ -366,6 +364,16 @@ export default function CrearVisitaPage() {
     }
   }
 
+  if (!ready) {
+    return (
+      <RequireAuth>
+        <main className="bg-gray-50 min-h-dvh text-gray-950 flex items-center justify-center text-xs text-zinc-500">
+          Verificando acceso…
+        </main>
+      </RequireAuth>
+    )
+  }
+
   return (
     <RequireAuth>
       <main className="overflow-hidden bg-gray-50 min-h-dvh text-gray-950">
@@ -385,10 +393,7 @@ export default function CrearVisitaPage() {
           <div className="mt-16 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-3xl">
               <Subheading>OPERACIÓN</Subheading>
-              <Heading
-                as="h1"
-                className="mt-2 text-balance"
-              >
+              <Heading as="h1" className="mt-2 text-balance">
                 Programar nueva visita
               </Heading>
               <p className="mt-4 max-w-xl text-sm/6 text-gray-600">
@@ -398,10 +403,7 @@ export default function CrearVisitaPage() {
 
             <div className="flex flex-col gap-3 sm:items-end">
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Button
-                  variant="secondary"
-                  href="/visitas"
-                >
+                <Button variant="secondary" href="/visitas">
                   ← Volver a Visitas
                 </Button>
               </div>
@@ -452,9 +454,7 @@ export default function CrearVisitaPage() {
                     type="datetime-local"
                     className="block w-full rounded-lg border border-transparent bg-white px-3 py-2 text-sm/6 text-gray-900 shadow-sm ring-1 ring-black/10"
                     value={scheduledAt}
-                    onChange={(e) =>
-                      setScheduledAt(e.target.value)
-                    }
+                    onChange={(e) => setScheduledAt(e.target.value)}
                     required
                   />
                 </div>
@@ -468,9 +468,7 @@ export default function CrearVisitaPage() {
                     className="block w-full rounded-lg border border-transparent bg-white px-3 py-2 text-sm/6 text-gray-900 shadow-sm ring-1 ring-black/10"
                     rows={5}
                     value={notaSupervisor}
-                    onChange={(e) =>
-                      setNotaSupervisor(e.target.value)
-                    }
+                    onChange={(e) => setNotaSupervisor(e.target.value)}
                     placeholder="Instrucciones iniciales, contexto, riesgos, etc."
                   />
                 </div>
@@ -486,15 +484,12 @@ export default function CrearVisitaPage() {
                   lat={clienteSel?.lat}
                   lng={clienteSel?.lng}
                   label={clienteSel?.nombre || 'Cliente'}
-                  direccion={
-                    clienteSel?.direccion || null
-                  }
+                  direccion={clienteSel?.direccion || null}
                 />
 
                 <p className="mt-2 text-[11px]/5 text-gray-500">
-                  Vista previa de la dirección del
-                  cliente. El técnico puede abrir la
-                  ruta en Google Maps o Waze.
+                  Vista previa de la dirección del cliente. El técnico
+                  puede abrir la ruta en Google Maps o Waze.
                 </p>
               </div>
 
@@ -512,9 +507,7 @@ export default function CrearVisitaPage() {
                   className="sm:w-auto w-full"
                   disabled={guardando}
                 >
-                  {guardando
-                    ? 'Guardando...'
-                    : 'Crear visita'}
+                  {guardando ? 'Guardando...' : 'Crear visita'}
                 </Button>
 
                 <Button

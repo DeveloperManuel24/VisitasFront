@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 
+import { useRouter } from 'next/navigation'
 import { Navbar } from '@/components/navbar'
 import { Container } from '@/components/container'
 import { Heading, Subheading } from '@/components/text'
@@ -15,52 +16,25 @@ import {
   type VisitaEstado,
 } from '../../../../api/visitas/apiVisitas'
 
-/* -------------------------------------------------
- * Helpers JWT
- * ------------------------------------------------- */
-
-/**
- * Intenta leer el JWT desde localStorage y decodificarlo sin validar firma.
- * Esperamos algo tipo:
- * {
- *   "sub": "01K7CHAFG016YJVBT81WBAPFN2",
- *   "email": "mordonezsilva@gmail.com",
- *   "name": "Manuel Ordoñez",
- *   "roles": ["ADMIN"],
- *   "iat": ...,
- *   "exp": ...
- * }
- *
- * Devuelve ese payload (o null si falla).
- */
 function getTokenPayload() {
   try {
-    // ajusta la key si en tu login lo guardaste con otro nombre
     const raw = window.localStorage.getItem('authToken')
     if (!raw) return null
-
     const parts = raw.split('.')
     if (parts.length !== 3) return null
-
-    const payloadB64 = parts[1]
-    // JWT usa base64url -> hay que normalizar
-    const base64 = payloadB64.replace(/-/g, '+').replace(/_/g, '/')
-    const payloadJson = atob(base64)
+    const payloadJson = atob(
+      parts[1].replace(/-/g, '+').replace(/_/g, '/'),
+    )
     const payload = JSON.parse(payloadJson)
     return { token: raw, payload }
-  } catch (err) {
-    console.error('Error leyendo/parseando JWT:', err)
+  } catch {
     return null
   }
 }
 
-/* -------------------------------------------------
- * Helpers visuales / formateo
- * ------------------------------------------------- */
 function formatDateTime(iso?: string | null) {
   if (!iso) return '—'
-  const d = new Date(iso)
-  return d.toLocaleString()
+  return new Date(iso).toLocaleString()
 }
 
 function badgeColor(estado: VisitaEstado) {
@@ -91,13 +65,9 @@ function EstadoPill({ estado }: { estado: VisitaEstado }) {
   )
 }
 
-/* -------------------------------------------------
- * Tarjeta compacta de una visita (para PENDIENTES / EN_CURSO)
- * ------------------------------------------------- */
 function CardVisitaPendiente({ v }: { v: VisitaItem }) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm ring-1 ring-black/5">
-      {/* header row */}
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="break-words text-sm/6 font-semibold text-gray-900">
@@ -107,27 +77,31 @@ function CardVisitaPendiente({ v }: { v: VisitaItem }) {
             {v.cliente?.direccion ?? 'Sin dirección'}
           </div>
         </div>
-
         <EstadoPill estado={v.estado} />
       </div>
 
-      {/* info row */}
       <div className="space-y-1 text-xs/5 text-gray-600">
         <div>
-          <span className="font-medium text-gray-900">Agendado:</span>{' '}
+          <span className="font-medium text-gray-900">
+            Agendado:
+          </span>{' '}
           {formatDateTime(v.scheduledAt)}
         </div>
 
         {v.notaSupervisor && (
           <div className="break-words">
-            <span className="font-medium text-gray-900">Nota sup:</span>{' '}
+            <span className="font-medium text-gray-900">
+              Nota sup:
+            </span>{' '}
             {v.notaSupervisor}
           </div>
         )}
 
         {v.notaTecnico && (
           <div className="break-words">
-            <span className="font-medium text-gray-900">Nota tec:</span>{' '}
+            <span className="font-medium text-gray-900">
+              Nota tec:
+            </span>{' '}
             {v.notaTecnico}
           </div>
         )}
@@ -141,7 +115,6 @@ function CardVisitaPendiente({ v }: { v: VisitaItem }) {
         )}
       </div>
 
-      {/* action row */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Link
           href={`/visitas/${v.id}/editar`}
@@ -176,9 +149,6 @@ function CardVisitaPendiente({ v }: { v: VisitaItem }) {
   )
 }
 
-/* -------------------------------------------------
- * Fila historial (COMPLETADA / CANCELADA)
- * ------------------------------------------------- */
 function RowHistorial({ v }: { v: VisitaItem }) {
   return (
     <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-sm ring-1 ring-black/5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -198,23 +168,33 @@ function RowHistorial({ v }: { v: VisitaItem }) {
 
         <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]/5 text-gray-600 sm:text-xs/5">
           <div className="truncate">
-            <span className="font-medium text-gray-900">Agendada:</span>{' '}
+            <span className="font-medium text-gray-900">
+              Agendada:
+            </span>{' '}
             {formatDateTime(v.scheduledAt)}
           </div>
 
           <div className="truncate">
-            <span className="font-medium text-gray-900">Check-in:</span>{' '}
+            <span className="font-medium text-gray-900">
+              Check-in:
+            </span>{' '}
             {formatDateTime(v.checkInAt)}
           </div>
 
           <div className="truncate">
-            <span className="font-medium text-gray-900">Check-out:</span>{' '}
+            <span className="font-medium text-gray-900">
+              Check-out:
+            </span>{' '}
             {formatDateTime(v.checkOutAt)}
           </div>
 
           <div className="truncate">
-            <span className="font-medium text-gray-900">Duración:</span>{' '}
-            {v.duracionMin != null ? `${v.duracionMin} min` : '—'}
+            <span className="font-medium text-gray-900">
+              Duración:
+            </span>{' '}
+            {v.duracionMin != null
+              ? `${v.duracionMin} min`
+              : '—'}
           </div>
         </div>
       </div>
@@ -242,106 +222,131 @@ function RowHistorial({ v }: { v: VisitaItem }) {
   )
 }
 
-/* -------------------------------------------------
- * Página principal del Técnico
- * ------------------------------------------------- */
+/* ======================================================
+ * Página principal
+ * ====================================================== */
 export default function VisitasTecnicoPage() {
-  // 1. agarramos el usuario logueado desde el JWT
-  const [tecnicoId, setTecnicoId] = useState<string | null>(null)
+  const router = useRouter()
 
-  // loading / error global
+  const [tecnicoId, setTecnicoId] = useState<string | null>(null)
+  const [rolesUsuario, setRolesUsuario] = useState<string[]>([])
+  const [sessionReady, setSessionReady] = useState(false)
+
   const [cargando, setCargando] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  // visitas del técnico (sin filtro de fechas = "pendientes / próximas")
-  const [visitasPendientesRaw, setVisitasPendientesRaw] = useState<VisitaItem[]>([])
+  const [visitasPendientesRaw, setVisitasPendientesRaw] = useState<
+    VisitaItem[]
+  >([])
+  const [visitasHistoricoRaw, setVisitasHistoricoRaw] = useState<
+    VisitaItem[]
+  >([])
 
-  // historial del mes seleccionado
-  const [visitasHistoricoRaw, setVisitasHistoricoRaw] = useState<VisitaItem[]>([])
-
-  // filtro de mes para histórico (YYYY-MM)
   const today = new Date()
-  const y = today.getFullYear()
-  const m = String(today.getMonth() + 1).padStart(2, '0')
-  const defaultMonth = `${y}-${m}`
-  const [mesSeleccionado, setMesSeleccionado] = useState(defaultMonth)
+  const defaultMonth = `${today.getFullYear()}-${String(
+    today.getMonth() + 1,
+  ).padStart(2, '0')}`
+  const [mesSeleccionado, setMesSeleccionado] =
+    useState(defaultMonth)
 
-  // util para rango del mes seleccionado
   function rangoMes(mesYYYYMM: string) {
-    const [yy, mm] = mesYYYYMM.split('-').map((n) => parseInt(n, 10))
-    const first = new Date(yy, mm - 1, 1) // primer día del mes
-    const next = new Date(yy, mm, 1) // primer día del mes siguiente
-    const last = new Date(next.getTime() - 1) // último ms del mes actual
-
-    return {
-      fromISO: first.toISOString(),
-      toISO: last.toISOString(),
-    }
+    const [yy, mm] = mesYYYYMM
+      .split('-')
+      .map((n) => parseInt(n, 10))
+    const first = new Date(yy, mm - 1, 1)
+    const next = new Date(yy, mm, 1)
+    const last = new Date(next.getTime() - 1)
+    return { fromISO: first.toISOString(), toISO: last.toISOString() }
   }
 
-  // 2. al montar, decodificamos el token y seteamos tecnicoId
+  // 1. leer token una vez
   useEffect(() => {
     const info = getTokenPayload()
-    if (!info || !info.payload?.sub) {
-      setErrorMsg('No se pudo identificar al usuario técnico.')
+    if (!info || !info.payload) {
       setTecnicoId(null)
+      setRolesUsuario([])
+      setSessionReady(true)
       setCargando(false)
+      setErrorMsg('No se pudo identificar la sesión.')
       return
     }
-    setTecnicoId(info.payload.sub)
+
+    const sub = info.payload.sub ?? null
+    const rolesRaw = Array.isArray(info.payload.roles)
+      ? info.payload.roles
+      : []
+    const rolesUpper = rolesRaw.map((r: any) =>
+      String(r).toUpperCase(),
+    )
+
+    setTecnicoId(sub)
+    setRolesUsuario(rolesUpper)
+    setSessionReady(true)
   }, [])
 
-  // 3. cada vez que tengamos tecnicoId y/o cambie el mes, cargamos visitas
+  const allowed =
+    rolesUsuario.includes('ADMINISTRADOR') ||
+    rolesUsuario.includes('TECNICO')
+
+  // 2. cargar data si allowed
   useEffect(() => {
+    if (!sessionReady) return
     if (!tecnicoId) return
+    if (!allowed) return
 
     let cancelado = false
-    async function run() {
+    ;(async () => {
       try {
         setCargando(true)
         setErrorMsg(null)
 
-        // visitas pendientes / próximas (sin rango)
-        const pendientesResp = await listarVisitasPorTecnico(tecnicoId)
+        const pendientesResp =
+          await listarVisitasPorTecnico(tecnicoId)
 
-        // historial filtrado por mes
         const { fromISO, toISO } = rangoMes(mesSeleccionado)
-        const historicoResp = await listarVisitasPorTecnico(tecnicoId, {
-          from: fromISO,
-          to: toISO,
-        })
+        const historicoResp = await listarVisitasPorTecnico(
+          tecnicoId,
+          {
+            from: fromISO,
+            to: toISO,
+          },
+        )
 
         if (cancelado) return
 
         setVisitasPendientesRaw(
-          Array.isArray(pendientesResp.data) ? pendientesResp.data : [],
+          Array.isArray(pendientesResp.data)
+            ? pendientesResp.data
+            : [],
         )
         setVisitasHistoricoRaw(
-          Array.isArray(historicoResp.data) ? historicoResp.data : [],
+          Array.isArray(historicoResp.data)
+            ? historicoResp.data
+            : [],
         )
       } catch (err) {
-        console.error('Error cargando visitas del técnico:', err)
         if (!cancelado) {
           setErrorMsg('No se pudieron cargar tus visitas.')
         }
       } finally {
-        if (!cancelado) setCargando(false)
+        if (!cancelado) {
+          setCargando(false)
+        }
       }
-    }
+    })()
 
-    run()
     return () => {
       cancelado = true
     }
-  }, [tecnicoId, mesSeleccionado])
+  }, [sessionReady, tecnicoId, allowed, mesSeleccionado])
 
-  // derivar listas listas para UI
-
-  // próximas = PENDIENTE o EN_CURSO más cercanas primero
+  // listas derivadas
   const visitasProximas = useMemo(() => {
     return visitasPendientesRaw
       .filter(
-        (v) => v.estado === 'PENDIENTE' || v.estado === 'EN_CURSO',
+        (v) =>
+          v.estado === 'PENDIENTE' ||
+          v.estado === 'EN_CURSO',
       )
       .sort(
         (a, b) =>
@@ -350,11 +355,12 @@ export default function VisitasTecnicoPage() {
       )
   }, [visitasPendientesRaw])
 
-  // histórico (COMPLETADA / CANCELADA) más recientes arriba
   const visitasHistorico = useMemo(() => {
     return visitasHistoricoRaw
       .filter(
-        (v) => v.estado === 'COMPLETADA' || v.estado === 'CANCELADA',
+        (v) =>
+          v.estado === 'COMPLETADA' ||
+          v.estado === 'CANCELADA',
       )
       .sort(
         (a, b) =>
@@ -363,12 +369,10 @@ export default function VisitasTecnicoPage() {
       )
   }, [visitasHistoricoRaw])
 
-  /* -------------------------------------------------
-   * Estados de carga inicial
-   * ------------------------------------------------- */
+  // ==== estados UI ====
 
-  // si todavía no obtuvimos ni siquiera el tecnicoId del token
-  if (tecnicoId === null && cargando) {
+  // todavía cargando roles/token
+  if (!sessionReady) {
     return (
       <RequireAuth>
         <main className="bg-gray-50 min-h-dvh text-gray-950">
@@ -383,38 +387,42 @@ export default function VisitasTecnicoPage() {
           </Container>
 
           <Container className="py-24 text-sm/6 text-gray-500">
-            Preparando tu sesión...
+            Verificando acceso…
           </Container>
         </main>
       </RequireAuth>
     )
   }
 
-  // si no hay tecnicoId válido
-  if (!tecnicoId) {
+  // sesión lista pero NO permitido
+  if (!allowed || !tecnicoId) {
     return (
       <RequireAuth>
         <main className="bg-gray-50 min-h-dvh text-gray-950">
           <Container>
             <Navbar
               banner={
-                <div className="flex items-center gap-1 rounded-full bg-blue-950/35 px-3 py-0.5 text-sm/6 font-medium text-white">
-                  Visitas Técnico — SkyNet Visitas
+                <div className="flex items-center gap-1 rounded-full bg-red-600/20 px-3 py-0.5 text-sm/6 font-medium text-red-700">
+                  Acceso denegado
                 </div>
               }
             />
           </Container>
 
-          <Container className="py-24 text-sm/6 text-gray-500">
-            {errorMsg ??
-              'No se pudo identificar al usuario. Inicia sesión de nuevo.'}
+          <Container className="py-24 text-center text-sm/6 text-gray-600">
+            No tenés permisos para ver esta sección.
+            <div className="mt-6">
+              <Button href="/" variant="secondary">
+                Volver al panel
+              </Button>
+            </div>
           </Container>
         </main>
       </RequireAuth>
     )
   }
 
-  // si ya tenemos tecnicoId pero estamos cargando datos
+  // allowed pero estamos trayendo data
   if (cargando) {
     return (
       <RequireAuth>
@@ -437,13 +445,10 @@ export default function VisitasTecnicoPage() {
     )
   }
 
-  /* -------------------------------------------------
-   * UI principal
-   * ------------------------------------------------- */
+  // render final
   return (
     <RequireAuth>
       <main className="overflow-hidden bg-gray-50 min-h-dvh text-gray-950">
-        {/* Navbar */}
         <Container>
           <Navbar
             banner={
@@ -455,7 +460,6 @@ export default function VisitasTecnicoPage() {
         </Container>
 
         <Container className="pb-24">
-          {/* Header */}
           <div className="mt-16 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-2xl">
               <Subheading>MI DÍA</Subheading>
@@ -463,9 +467,9 @@ export default function VisitasTecnicoPage() {
                 Tus visitas en campo
               </Heading>
               <p className="mt-4 max-w-xl text-sm/6 text-gray-600">
-                Aquí ves lo que tenés pendiente, podés entrar al detalle para
-                hacer check-in / check-out y dejar notas. También mirás tu
-                historial por mes.
+                Aquí ves lo que tenés pendiente, podés entrar al
+                detalle para hacer check-in / check-out y dejar
+                notas. También mirás tu historial por mes.
               </p>
 
               {errorMsg && (
@@ -476,15 +480,15 @@ export default function VisitasTecnicoPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:items-end">
+              {/* botón admin opcional, lo dejamos igual que tenías */}
               <Button variant="secondary" href="/visitas">
                 ← Ir a Visitas (admin)
               </Button>
             </div>
           </div>
 
-          {/* Contenido responsive 2 columnas */}
           <section className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-2">
-            {/* IZQ: próximas visitas */}
+            {/* próximas visitas */}
             <div className="flex flex-col rounded-xl bg-white p-6 shadow-md ring-1 ring-black/5">
               <div className="flex flex-wrap items-baseline justify-between gap-4">
                 <h2 className="text-sm/6 font-medium text-gray-900">
@@ -511,7 +515,7 @@ export default function VisitasTecnicoPage() {
               )}
             </div>
 
-            {/* DER: historial */}
+            {/* historial mensual */}
             <div className="flex flex-col rounded-xl bg-white p-6 shadow-md ring-1 ring-black/5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -523,7 +527,6 @@ export default function VisitasTecnicoPage() {
                   </p>
                 </div>
 
-                {/* selector de mes */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px]/5 font-medium text-gray-700">
                     Mes
@@ -532,7 +535,9 @@ export default function VisitasTecnicoPage() {
                     type="month"
                     className="block w-full rounded-lg border border-transparent bg-white px-3 py-2 text-xs/5 text-gray-900 shadow-sm ring-1 ring-black/10"
                     value={mesSeleccionado}
-                    onChange={(e) => setMesSeleccionado(e.target.value)}
+                    onChange={(e) =>
+                      setMesSeleccionado(e.target.value)
+                    }
                   />
                 </div>
               </div>

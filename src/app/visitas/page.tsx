@@ -1,11 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+
 import { Navbar } from '@/components/navbar'
 import { Container } from '@/components/container'
 import { Heading, Subheading } from '@/components/text'
 import { Button } from '@/components/button'
 import RequireAuth from '@/app/components/require-auth'
+import { useAuth } from '@/app/components/auth-context'
 
 import {
   listarVisitas,
@@ -87,11 +90,25 @@ function fmtHora(iso?: string | null) {
 /* ---------------- page ---------------- */
 
 export default function VisitasPage() {
+  const router = useRouter()
+  const { roles } = useAuth()
+
+  // gate de acceso: solo ADMINISTRADOR o SUPERVISOR
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    if (!roles || roles.length === 0) return
+    const upper = roles.map((r) => r.toUpperCase())
+    if (!upper.includes('ADMINISTRADOR') && !upper.includes('SUPERVISOR')) {
+      router.replace('/unauthorized')
+      return
+    }
+    setReady(true)
+  }, [roles, router])
+
   // filtros
   const [q, setQ] = useState('')
-  const [estadoFiltro, setEstadoFiltro] = useState<
-    '' | VisitaEstado
-  >('')
+  const [estadoFiltro, setEstadoFiltro] = useState<'' | VisitaEstado>('')
   const [page, setPage] = useState(1)
 
   // data
@@ -103,6 +120,8 @@ export default function VisitasPage() {
 
   // cargar lista
   useEffect(() => {
+    if (!ready) return
+
     let cancelado = false
     ;(async () => {
       try {
@@ -137,7 +156,7 @@ export default function VisitasPage() {
     return () => {
       cancelado = true
     }
-  }, [q, estadoFiltro, page])
+  }, [ready, q, estadoFiltro, page])
 
   function handleBuscar(e: React.FormEvent) {
     e.preventDefault()
@@ -176,6 +195,17 @@ export default function VisitasPage() {
       console.error('Error eliminando visita:', err)
       setMensaje('❌ Error al eliminar la visita.')
     }
+  }
+
+  // mientras validamos rol para no filtrar data sensible
+  if (!ready) {
+    return (
+      <RequireAuth>
+        <main className="bg-gray-50 min-h-dvh text-gray-950 flex items-center justify-center text-xs text-zinc-500">
+          Verificando acceso…
+        </main>
+      </RequireAuth>
+    )
   }
 
   return (
@@ -249,9 +279,7 @@ export default function VisitasPage() {
                   className="block w-full rounded-lg border border-transparent bg-white px-3 py-2 text-sm/6 text-gray-900 shadow-sm ring-1 ring-black/10"
                   value={estadoFiltro}
                   onChange={(e) => {
-                    setEstadoFiltro(
-                      e.target.value as '' | VisitaEstado,
-                    )
+                    setEstadoFiltro(e.target.value as '' | VisitaEstado)
                     setPage(1)
                   }}
                 >
@@ -274,9 +302,7 @@ export default function VisitasPage() {
                 <div className="rounded-lg border border-transparent bg-gray-50 px-3 py-2 text-sm/6 text-gray-900 shadow-sm ring-1 ring-black/10">
                   {cargando
                     ? 'Cargando...'
-                    : `${total} visita${
-                        total === 1 ? '' : 's'
-                      } (${page}/${pages})`}
+                    : `${total} visita${total === 1 ? '' : 's'} (${page}/${pages})`}
                 </div>
 
                 <div className="flex gap-2">
@@ -328,9 +354,7 @@ export default function VisitasPage() {
               <div className="col-span-2">Supervisor</div>
               <div className="col-span-2">Técnico</div>
               <div className="col-span-2">Horario</div>
-              <div className="col-span-1 text-center">
-                Duración
-              </div>
+              <div className="col-span-1 text-center">Duración</div>
               <div className="col-span-2 text-right">Acciones</div>
             </div>
 

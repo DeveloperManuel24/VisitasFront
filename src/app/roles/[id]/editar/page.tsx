@@ -2,63 +2,109 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+
 import { Navbar } from '@/components/navbar'
 import { Container } from '@/components/container'
 import { Heading, Subheading } from '@/components/text'
 import { Button } from '@/components/button'
-import { actualizarRol, listarRoles } from '@/../api/roles/apiRoles' // ajusta el path
+
+import {
+  actualizarRol,
+  listarRoles,
+} from '../../../../../api/roles/apiRoles'
+
 import RequireAuth from '@/app/components/require-auth'
+import { useAuth } from '@/app/components/auth-context'
 
 type EditPageProps = {
-  params: { id: string } // <- Next te lo inyecta
+  params: { id: string }
 }
 
+/**
+ * VISIBILIDAD:
+ * - ADMINISTRADOR ✅
+ * - SUPERVISOR ❌
+ * - TECNICO ❌
+ */
 export default function EditarRolPage({ params }: EditPageProps) {
   const { id } = params
   const router = useRouter()
 
+  // auth del user logueado
+  const { roles } = useAuth()
+
+  // gateo de acceso
+  const [ready, setReady] = useState(false)
+
+  // estado de carga / edición
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState<string | null>(null)
 
+  // campos del rol
   const [nombre, setNombre] = useState('')
   const [descripcion, setDescripcion] = useState('')
 
-  // cargar datos iniciales del rol que voy a editar
+  // =========================
+  // 1. validar acceso (solo ADMINISTRADOR)
+  // =========================
   useEffect(() => {
-    const cargar = async () => {
+    // todavía no tenemos roles (primer render), esperamos
+    if (!roles || roles.length === 0) return
+
+    if (!roles.includes('ADMINISTRADOR')) {
+      // no tiene permisos para ver roles
+      router.replace('/unauthorized')
+      return
+    }
+
+    setReady(true)
+  }, [roles, router])
+
+  // =========================
+  // 2. cargar datos iniciales del rol UNA VEZ tengamos permiso
+  // =========================
+  useEffect(() => {
+    if (!ready) return
+
+    const cargarRol = async () => {
       try {
-        const roles = await listarRoles()
-        const rolActual = Array.isArray(roles)
-          ? roles.find((r: any) => String(r.id) === String(id))
+        const rolesArr = await listarRoles()
+        const rolActual = Array.isArray(rolesArr)
+          ? rolesArr.find((r: any) => String(r.id) === String(id))
           : null
 
         if (rolActual) {
           setNombre(rolActual.nombre ?? '')
           setDescripcion(rolActual.descripcion ?? '')
         } else {
-          setMensaje('No se encontró el rol')
+          setMensaje('No se encontró el rol solicitado.')
         }
       } catch (err) {
         console.error('Error cargando rol:', err)
-        setMensaje('Error cargando datos del rol')
+        setMensaje('Error cargando datos del rol.')
       } finally {
         setCargando(false)
       }
     }
 
-    cargar()
-  }, [id])
+    cargarRol()
+  }, [ready, id])
 
+  // =========================
+  // 3. guardar cambios
+  // =========================
   async function handleGuardar(e: React.FormEvent) {
     e.preventDefault()
     setGuardando(true)
     setMensaje(null)
+
     try {
       await actualizarRol(String(id), {
         nombre,
         descripcion,
       })
+
       setMensaje('✅ Cambios guardados.')
     } catch (err) {
       console.error('Error actualizando rol:', err)
@@ -68,6 +114,22 @@ export default function EditarRolPage({ params }: EditPageProps) {
     }
   }
 
+  // =========================
+  // estados de "espera"
+  // =========================
+
+  // 1) todavía verificando si es admin:
+  if (!ready) {
+    return (
+      <RequireAuth>
+        <main className="bg-gray-50 min-h-dvh text-gray-950 flex items-center justify-center text-xs text-zinc-500">
+          Verificando acceso…
+        </main>
+      </RequireAuth>
+    )
+  }
+
+  // 2) ya sé que es admin, pero aún no traje el rol
   if (cargando) {
     return (
       <RequireAuth>
@@ -83,9 +145,13 @@ export default function EditarRolPage({ params }: EditPageProps) {
     )
   }
 
+  // =========================
+  // UI normal
+  // =========================
   return (
     <RequireAuth>
       <main className="overflow-hidden bg-gray-50 min-h-dvh text-gray-950">
+        {/* Navbar con banner */}
         <Container>
           <Navbar
             banner={
@@ -97,7 +163,7 @@ export default function EditarRolPage({ params }: EditPageProps) {
         </Container>
 
         <Container className="pb-24">
-          {/* header */}
+          {/* Header de la página */}
           <div className="mt-16 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <Subheading>Seguridad</Subheading>
@@ -116,9 +182,10 @@ export default function EditarRolPage({ params }: EditPageProps) {
             </div>
           </div>
 
-          {/* form */}
+          {/* Card / Formulario */}
           <section className="mt-10 max-w-xl rounded-xl bg-white p-6 shadow-md ring-1 ring-black/5">
             <form onSubmit={handleGuardar} className="space-y-5">
+              {/* Nombre del rol */}
               <div>
                 <label className="block text-sm/5 font-medium text-gray-900">
                   Nombre del rol
@@ -132,6 +199,7 @@ export default function EditarRolPage({ params }: EditPageProps) {
                 />
               </div>
 
+              {/* Descripción */}
               <div>
                 <label className="block text-sm/5 font-medium text-gray-900">
                   Descripción
@@ -145,12 +213,14 @@ export default function EditarRolPage({ params }: EditPageProps) {
                 />
               </div>
 
+              {/* Mensaje de feedback */}
               {mensaje && (
                 <div className="text-sm/6 font-medium text-gray-700">
                   {mensaje}
                 </div>
               )}
 
+              {/* Botones */}
               <div className="pt-2 flex flex-col gap-3 sm:flex-row">
                 <Button
                   type="submit"
