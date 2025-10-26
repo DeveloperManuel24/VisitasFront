@@ -9,7 +9,7 @@ import { Link } from '@/components/link'
 import { Mark } from '@/components/logo'
 import { Field, Input, Label } from '@headlessui/react'
 import { clsx } from 'clsx'
-import { resetPasswordRequest } from '../../../api/Auth/apiAuth'
+import { resetPasswordRequest } from '../../../../api/Auth/apiAuth'
 
 export default function ResetPasswordClient() {
   const router = useRouter()
