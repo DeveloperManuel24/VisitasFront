@@ -5,6 +5,13 @@ import axios from 'axios'
 const AUTH_STORAGE_KEY = 'authToken'
 
 /* =========================
+   Base URL dinámica
+   ========================= */
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_USUARIOS_API_BASE_URL ||
+  'http://localhost:3000' // fallback local para dev
+
+/* =========================
    helpers de token localStorage
    ========================= */
 
@@ -69,7 +76,10 @@ export function isAuthenticated(): boolean {
    instancia AXIOS para AUTH
    ========================= */
 const axiosAuth = axios.create({
-  baseURL: 'http://localhost:3000', // cambia si tu backend usa otro puerto
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 })
 
 /* =========================
@@ -94,7 +104,10 @@ export async function forgotPasswordRequest(email: string) {
 /* =========================
    RESET PASSWORD
    ========================= */
-export async function resetPasswordRequest(token: string, newPassword: string) {
+export async function resetPasswordRequest(
+  token: string,
+  newPassword: string,
+) {
   const resp = await axiosAuth.post('/auth/reset-password', {
     token,
     newPassword,
@@ -110,7 +123,10 @@ export async function resetPasswordRequest(token: string, newPassword: string) {
      "newPassword": "<nueva contraseña>"
    }
    ========================= */
-export async function changePassword(userId: string, newPassword: string) {
+export async function changePassword(
+  userId: string,
+  newPassword: string,
+) {
   try {
     const token = getAuthToken()
     if (!token) {

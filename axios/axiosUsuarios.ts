@@ -8,8 +8,7 @@ export const setUsuariosAuthToken = (token: string) => {
 
 const axiosUsuarios = axios.create({
   baseURL:
-    process.env.NEXT_PUBLIC_USUARIOS_API_BASE_URL ||
-    "http://localhost:3000",
+    process.env.NEXT_PUBLIC_USUARIOS_API_BASE_URL ,
   timeout: 10000,
   headers: {
     "Content-Type": "application/json", // <- FIX: sin espacio raro

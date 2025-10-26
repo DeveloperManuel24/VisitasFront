@@ -8,8 +8,7 @@ export const setClientesAuthToken = (token: string) => {
 
 const axiosClientes = axios.create({
   baseURL:
-    process.env.NEXT_PUBLIC_CLIENTES_API_BASE_URL ||
-    "http://localhost:3001",
+    process.env.NEXT_PUBLIC_CLIENTES_API_BASE_URL ,
   timeout: 10000,
   headers: { "Content-Type": "application/json" },
 });
