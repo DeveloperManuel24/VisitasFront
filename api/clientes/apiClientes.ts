@@ -1,73 +1,102 @@
-import axiosClientes from "../../axios/axiosClientes";
+'use client'
 
-// src/api/clientes/apiClientes.ts
+import axiosClientes from '../../axios/axiosClientes'
 
-// 🧩 Función auxiliar para extraer la data útil
-const safeData = (response: any) => {
-  const data = response?.data?.data ?? response?.data;
-  if (data === undefined) {
-    console.warn("⚠️ Respuesta inesperada:", response);
-  }
-  return data;
-};
+/**
+ * TIPOS
+ */
+export type ClienteItem = {
+  id: string
+  nombre: string
+  direccion?: string | null
+  telefono?: string | null
+  correo?: string | null
+  nit?: string | null
+  lat?: number | null
+  lng?: number | null
 
-/* ======================================================
-   🧾 CLIENTES API — consumo del controlador NestJS
-   ====================================================== */
+  // timestamps opcionales
+  creadoEn?: string
+  actualizadoEn?: string
+}
 
-// 📌 Crear nuevo cliente
-export const crearCliente = async (payload: any) => {
-  try {
-    const response = await axiosClientes.post("/clientes", payload);
-    return safeData(response);
-  } catch (error) {
-    console.error("❌ Error al crear cliente:", error);
-    throw error;
-  }
-};
+export type QueryClientesInput = {
+  q?: string
+  page?: number
+  limit?: number
+}
 
-// 🔍 Buscar clientes (con querystring opcional)
-export const buscarClientes = async (query?: string) => {
-  try {
-    const response = await axiosClientes.get("/clientes", {
-      params: { query },
-    });
-    return safeData(response) || [];
-  } catch (error) {
-    console.error("❌ Error al buscar clientes:", error);
-    return [];
-  }
-};
+/**
+ * LISTAR CLIENTES
+ * GET /clientes
+ */
+export async function listarClientes(params: QueryClientesInput = {}) {
+  const resp = await axiosClientes.get('/clientes', {
+    params: {
+      q: params.q,
+      page: params.page ?? 1,
+      limit: params.limit ?? 50,
+    },
+  })
 
-// 📋 Obtener detalle de cliente por ID
-export const obtenerClientePorId = async (id: string) => {
-  try {
-    const response = await axiosClientes.get(`/clientes/${id}`);
-    return safeData(response);
-  } catch (error) {
-    console.error("❌ Error al obtener cliente:", error);
-    return null;
-  }
-};
+  // backend: { data, meta }
+  return resp.data
+}
 
-// ✏️ Actualizar cliente existente
-export const actualizarCliente = async (id: string, payload: any) => {
-  try {
-    const response = await axiosClientes.patch(`/clientes/${id}`, payload);
-    return safeData(response);
-  } catch (error) {
-    console.error("❌ Error al actualizar cliente:", error);
-    throw error;
-  }
-};
+/**
+ * OBTENER CLIENTE POR ID
+ * GET /clientes/:id
+ */
+export async function obtenerClientePorId(
+  id: string,
+): Promise<ClienteItem | null> {
+  if (!id) return null
+  const resp = await axiosClientes.get(`/clientes/${id}`)
+  return resp.data ?? null
+}
 
-// 🗑 Eliminar cliente
-export const eliminarCliente = async (id: string) => {
-  try {
-    const response = await axiosClientes.delete(`/clientes/${id}`);
-    return safeData(response);
-  } catch (error) {
-    console.error("❌ Error al eliminar cliente:", error);
-    throw error;
-  }
-};
+/**
+ * CREAR CLIENTE
+ * POST /clientes
+ */
+export async function crearCliente(payload: {
+  nombre: string
+  direccion?: string | null
+  telefono?: string | null
+  correo?: string | null
+  nit?: string | null
+  lat?: number | null
+  lng?: number | null
+}) {
+  const resp = await axiosClientes.post('/clientes', payload)
+  return resp.data
+}
+
+/**
+ * ACTUALIZAR CLIENTE
+ * PATCH /clientes/:id
+ */
+export async function actualizarCliente(
+  id: string,
+  payload: {
+    nombre?: string
+    direccion?: string | null
+    telefono?: string | null
+    correo?: string | null
+    nit?: string | null
+    lat?: number | null
+    lng?: number | null
+  },
+) {
+  const resp = await axiosClientes.patch(`/clientes/${id}`, payload)
+  return resp.data
+}
+
+/**
+ * ELIMINAR CLIENTE
+ * DELETE /clientes/:id
+ */
+export async function eliminarCliente(id: string) {
+  const resp = await axiosClientes.delete(`/clientes/${id}`)
+  return resp.data
+}

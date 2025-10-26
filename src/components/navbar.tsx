@@ -11,10 +11,11 @@ import { Link } from './link'
 import { Logo } from './logo'
 import { PlusGrid, PlusGridItem, PlusGridRow } from './plus-grid'
 
-// Menú principal de la app
+// Menú principal visible en navbar
 const links = [
   { href: '/clientes', label: 'Clientes' },
-  { href: '/visitas', label: 'Visitas' },
+  { href: '/visitas', label: 'Visitas' },            // vista coordinador / admin
+  { href: '/visitas/tecnico', label: 'Visitas Técnico' }, // dashboard técnico
   { href: '/usuarios', label: 'Usuarios' },
   { href: '/roles', label: 'Roles' },
   { href: '/login', label: 'Login' },
@@ -91,7 +92,6 @@ export function Navbar({ banner }: { banner?: React.ReactNode }) {
           <div className="relative flex gap-6">
             <PlusGridItem className="py-3">
               <Link href="/" title="Inicio">
-                {/* Logo visual de la marca */}
                 <Logo className="h-9" />
               </Link>
             </PlusGridItem>

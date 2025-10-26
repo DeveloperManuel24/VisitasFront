@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navbar } from '@/components/navbar'
 import { Container } from '@/components/container'
 import { Heading, Subheading } from '@/components/text'
@@ -34,6 +34,9 @@ export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<UsuarioItem[]>([])
   const [cargando, setCargando] = useState(false)
 
+  // 🔥 filtro de rol seleccionado
+  const [rolFiltro, setRolFiltro] = useState<'TODOS' | 'TECNICO' | 'SUPERVISOR' | 'ADMINISTRADOR'>('TODOS')
+
   async function refrescar() {
     try {
       setCargando(true)
@@ -63,6 +66,22 @@ export default function UsuariosPage() {
       console.error('Error eliminando usuario:', err)
     }
   }
+
+  // util para normalizar rol
+  function tieneRol(u: UsuarioItem, rolBuscado: string) {
+    if (!u.usuariosRoles || u.usuariosRoles.length === 0) return false
+    return u.usuariosRoles.some(
+      (ur) =>
+        ur.rol?.nombre &&
+        ur.rol.nombre.toUpperCase().trim() === rolBuscado.toUpperCase().trim()
+    )
+  }
+
+  // lista filtrada según rolFiltro
+  const usuariosFiltrados = useMemo(() => {
+    if (rolFiltro === 'TODOS') return usuarios
+    return usuarios.filter((u) => tieneRol(u, rolFiltro))
+  }, [usuarios, rolFiltro])
 
   return (
     <RequireAuth>
@@ -100,31 +119,68 @@ export default function UsuariosPage() {
 
           {/* Wrapper tabla / lista */}
           <section className="mt-10 rounded-xl bg-white p-6 shadow-md ring-1 ring-black/5">
+            {/* Header de la lista + filtro */}
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <h2 className="text-sm/6 font-medium text-gray-950">
-                Lista de usuarios
-              </h2>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <h2 className="text-sm/6 font-medium text-gray-950">
+                  Lista de usuarios
+                </h2>
+
+                {/* 🔎 Filtro de rol */}
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="rolFiltro"
+                    className="text-xs/5 font-medium text-gray-500 uppercase"
+                  >
+                    Filtrar por rol
+                  </label>
+
+                  <select
+                    id="rolFiltro"
+                    value={rolFiltro}
+                    onChange={(e) =>
+                      setRolFiltro(
+                        e.target.value as
+                          | 'TODOS'
+                          | 'TECNICO'
+                          | 'SUPERVISOR'
+                          | 'ADMINISTRADOR'
+                      )
+                    }
+                    className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs/5 text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  >
+                    <option value="TODOS">Todos</option>
+                    <option value="TECNICO">Técnico</option>
+                    <option value="SUPERVISOR">Supervisor</option>
+                    <option value="ADMINISTRADOR">Administrador</option>
+                  </select>
+                </div>
+              </div>
 
               <div className="text-xs/5 text-gray-500">
                 {cargando
                   ? 'Cargando...'
-                  : `${usuarios.length} usuario${
-                      usuarios.length === 1 ? '' : 's'
+                  : `${usuariosFiltrados.length} usuario${
+                      usuariosFiltrados.length === 1 ? '' : 's'
                     } encontrados`}
               </div>
             </div>
 
             {/* --- Vista MOBILE (cards) --- */}
             <ul className="mt-6 flex flex-col gap-4 lg:hidden">
-              {usuarios.length === 0 && !cargando ? (
+              {usuariosFiltrados.length === 0 && !cargando ? (
                 <li className="text-center py-8 text-gray-400 text-sm/6">
-                  No hay usuarios registrados.
+                  {rolFiltro === 'TODOS'
+                    ? 'No hay usuarios registrados.'
+                    : `No hay usuarios con rol ${rolFiltro}.`}
                 </li>
               ) : (
-                usuarios.map((u) => {
+                usuariosFiltrados.map((u) => {
                   const rolesList =
                     u.usuariosRoles && u.usuariosRoles.length > 0
-                      ? u.usuariosRoles.map((ur) => ur.rol?.nombre).filter(Boolean)
+                      ? u.usuariosRoles
+                          .map((ur) => ur.rol?.nombre)
+                          .filter(Boolean) as string[]
                       : []
 
                   return (
@@ -269,17 +325,19 @@ export default function UsuariosPage() {
                 </thead>
 
                 <tbody className="align-top">
-                  {usuarios.length === 0 && !cargando ? (
+                  {usuariosFiltrados.length === 0 && !cargando ? (
                     <tr>
                       <td
                         colSpan={5}
                         className="py-8 text-center text-gray-400 text-sm/6"
                       >
-                        No hay usuarios registrados.
+                        {rolFiltro === 'TODOS'
+                          ? 'No hay usuarios registrados.'
+                          : `No hay usuarios con rol ${rolFiltro}.`}
                       </td>
                     </tr>
                   ) : (
-                    usuarios.map((u) => (
+                    usuariosFiltrados.map((u) => (
                       <tr
                         key={u.id}
                         className="border-b border-gray-100 last:border-0"
