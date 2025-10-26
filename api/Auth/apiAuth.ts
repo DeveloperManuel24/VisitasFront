@@ -8,8 +8,7 @@ const AUTH_STORAGE_KEY = 'authToken'
    Base URL dinámica
    ========================= */
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_USUARIOS_API_BASE_URL ||
-  'http://localhost:3000' // fallback local para dev
+  process.env.NEXT_PUBLIC_USUARIOS_API_BASE_URL
 
 /* =========================
    helpers de token localStorage
