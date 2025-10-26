@@ -1,5 +1,8 @@
 'use client'
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -11,15 +14,12 @@ import { Field, Input, Label } from '@headlessui/react'
 import { clsx } from 'clsx'
 import { resetPasswordRequest } from '../../../../api/Auth/apiAuth'
 
-
 export default function ResetPasswordPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // sacamos el ?token=...
   const tokenFromQuery = searchParams.get('token') || ''
 
-  // state interno
   const [token, setToken] = useState('')
   const [pass1, setPass1] = useState('')
   const [pass2, setPass2] = useState('')
@@ -27,7 +27,6 @@ export default function ResetPasswordPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  // cuando entra la página, guardamos el token del query param
   useEffect(() => {
     setToken(tokenFromQuery)
   }, [tokenFromQuery])
@@ -39,7 +38,6 @@ export default function ResetPasswordPage() {
     setErrorMsg(null)
     setSuccessMsg(null)
 
-    // Validaciones básicas frontend
     if (!token) {
       setErrorMsg('Token inválido. Vuelve a solicitar el enlace.')
       return
@@ -59,13 +57,8 @@ export default function ResetPasswordPage() {
 
       setSuccessMsg('Tu contraseña fue actualizada correctamente.')
       setLoading(false)
-
-      // opcional: después de unos segundos o botón, mandar al login
-      // acá usamos botón abajo, no redirigimos automático
     } catch (err: any) {
       console.error('[reset-password] error', err)
-      // mensaje estándar que tu backend manda en errores comunes:
-      // "Token inválido o expirado", "La contraseña debe tener al menos 8 caracteres"
       setErrorMsg(
         err?.response?.data?.message ||
           'No se pudo actualizar la contraseña. El enlace puede haber expirado.',
@@ -85,7 +78,6 @@ export default function ResetPasswordPage() {
       <div className="isolate flex min-h-dvh items-center justify-center p-6 lg:p-8">
         <div className="w-full max-w-md rounded-xl bg-white shadow-md ring-1 ring-black/5">
           <form onSubmit={handleSubmit} className="p-7 sm:p-11">
-            {/* header / logo */}
             <div className="flex items-start">
               <Link href="/" title="Home">
                 <Mark className="h-9 fill-black" />
@@ -100,7 +92,6 @@ export default function ResetPasswordPage() {
               Ingresa tu nueva contraseña. Este enlace es temporal.
             </p>
 
-            {/* campo contraseña nueva */}
             <Field className="mt-8 space-y-3">
               <Label className="text-sm/5 font-medium">Nueva contraseña</Label>
               <Input
@@ -115,12 +106,9 @@ export default function ResetPasswordPage() {
                   'data-focus:outline-2 data-focus:-outline-offset-1 data-focus:outline-black',
                 )}
               />
-              <p className="text-xs text-gray-500">
-                Mínimo 8 caracteres.
-              </p>
+              <p className="text-xs text-gray-500">Mínimo 8 caracteres.</p>
             </Field>
 
-            {/* confirmar contraseña */}
             <Field className="mt-6 space-y-3">
               <Label className="text-sm/5 font-medium">Confirmar contraseña</Label>
               <Input
@@ -137,7 +125,6 @@ export default function ResetPasswordPage() {
               />
             </Field>
 
-            {/* Mensajes de error / ok */}
             {errorMsg && (
               <div className="mt-4 text-sm/5 font-medium text-red-500">
                 {errorMsg}
@@ -150,20 +137,12 @@ export default function ResetPasswordPage() {
               </div>
             )}
 
-            {/* submit */}
             <div className="mt-8">
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loading}
-              >
-                {loading
-                  ? 'Actualizando…'
-                  : 'Guardar nueva contraseña'}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Actualizando…' : 'Guardar nueva contraseña'}
               </Button>
             </div>
 
-            {/* volver a login */}
             <div className="mt-6 text-center text-sm/5 text-gray-600">
               <button
                 type="button"
@@ -175,7 +154,6 @@ export default function ResetPasswordPage() {
             </div>
           </form>
 
-          {/* cajita footer interna */}
           <div className="m-1.5 rounded-lg bg-gray-50 py-4 text-center text-sm/5 ring-1 ring-black/5">
             <span className="text-gray-600">¿Ya tienes acceso?</span>{' '}
             <button
